@@ -10,15 +10,33 @@ namespace PokerServer.Model
     /// </summary>
     class Player
     {
-        bool HasDealersButton;
+        /// <summary>
+        /// Flag representing if the player is the dealer.
+        /// </summary>
+        bool HasDealersButton { get; set; }
+        /// <summary>
+        /// Flag representing if the player is SB.
+        /// </summary>
+        bool IsSmallBlind { get; set; }
+        /// <summary>
+        /// Flag representing if the player is BB.
+        /// </summary>
+        bool IsBigBlind { get; set; }
+        /// <summary>
+        /// Flag representing if the player has folded current hand.
+        /// </summary>
+        public bool HasFolded { get; set; }
+
         int ChipsRemaining;
-        Card[] Hand;
+        private Card[] _hand;
         Guid Id;
+
+        public string Hand => string.Join(" ", _hand.ToList());
 
         public Player()
         {
             Id = Guid.NewGuid();
-            Hand = new Card[2];
+            _hand = new Card[2];
         }
 
         /// <summary>
@@ -28,13 +46,13 @@ namespace PokerServer.Model
         /// <param name="card">Card being dealt</param>
         public void GiveCard(Card card)
         {
-            if (Hand[0] != null && Hand[1] != null)
+            if (_hand[0] != null && _hand[1] != null)
                 throw new InvalidOperationException("Error: Player already has two cards.");
 
-            if (!Hand.Any())
-                Hand[0] = card;
+            if (!_hand.Any(c => c != null))
+                _hand[0] = card;
             else
-                Hand[1] = card;
+                _hand[1] = card;
         }
     }
 }

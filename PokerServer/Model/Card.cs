@@ -3,26 +3,31 @@
     /// <summary>
     /// Represents a single card.
     /// </summary>
-    class Card
+    public class Card
     {
         /// <summary>
         /// Card's suit.
         /// </summary>
-        internal Suits Suit { get; private set; }
+        internal CardSuit Suit { get; private set; }
         /// <summary>
-        /// Card's rank. 1 = Ace, 11 = Jack, 12 = Queen, 13 = King
+        /// Card's rank. a = Ace, j = Jack, q = Queen, k = King
         /// </summary>
-        internal int Rank { get; private set; }
+        internal char Rank { get; private set; }
 
         /// <summary>
         /// Creates a new card for a specific suit and rank.
         /// </summary>
         /// <param name="suit">The suit of the card</param>
         /// <param name="rank">The rank of the card</param>
-        internal Card(Suits suit, int rank)
+        public Card(CardSuit suit, char rank)
         {
             Suit = suit;
             Rank = rank;
+        }
+
+        public override string ToString()
+        {
+            return $"{Rank}{(char)Suit}";
         }
     }
 }

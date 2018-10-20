@@ -3,11 +3,11 @@
     /// <summary>
     /// Enum representing a card's suit.
     /// </summary>
-    enum Suits
+    public enum CardSuit
     {
-        Spades,
-        Hearts,
-        Clubs,
-        Diamonds
+        Clubs = 'c',
+        Diamonds = 'd',
+        Hearts = 'h',
+        Spades = 's'
     }
 }

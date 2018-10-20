@@ -34,9 +34,9 @@ namespace PokerServer.Model
             _cards = new List<Card>();
 
             // Generates the cards, should result in 52
-            foreach (var suit in Enum.GetValues(typeof(Suits)).Cast<Suits>())
-                for (var i = 1; i <= 13; i++)
-                    _cards.Add(new Card(suit, i));
+            foreach (var suit in Enum.GetValues(typeof(CardSuit)).Cast<CardSuit>())
+                foreach (var rank in "23456789TJQKA".ToCharArray())
+                    _cards.Add(new Card(suit, rank));
 
             Shuffle();
         }
@@ -67,6 +67,15 @@ namespace PokerServer.Model
                 throw new InvalidOperationException("Error: no more cards left to draw.");
 
             return _cards[_index++];
+        }
+
+        /// <summary>
+        /// Resets the deck back to having no cards drawn from it.
+        /// </summary>
+        public void Reset()
+        {
+            _index = 0;
+            Shuffle();
         }
     }
 }
