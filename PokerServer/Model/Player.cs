@@ -27,9 +27,9 @@ namespace PokerServer.Model
         /// </summary>
         public bool HasFolded { get; set; }
 
-        int ChipsRemaining;
+        public int Chips;
         private Card[] _hand;
-        Guid Id;
+        public Guid Id;
 
         public string Hand => string.Join(" ", _hand.ToList());
 

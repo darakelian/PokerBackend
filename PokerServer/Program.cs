@@ -1,4 +1,5 @@
-﻿using PokerServer.Core;
+﻿using HoldemHand;
+using PokerServer.Core;
 using PokerServer.Model;
 using System;
 
@@ -20,7 +21,7 @@ namespace PokerServer
             Console.WriteLine($"Table was {table.Board}");
             Console.WriteLine("Winners hand:");
             foreach (var winner in winners)
-                Console.WriteLine(winner.Hand);
+                Console.WriteLine(new Hand(winner.Hand, table.Board).Description);
             Console.WriteLine("Other hands were:");
             foreach (var player in table.Players)
                 if (!winners.Contains(player))
