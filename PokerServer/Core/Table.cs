@@ -57,6 +57,7 @@ namespace PokerServer.Core
             _deck.DrawCard();
             for (var i = 0; i < 3; i++)
                 _faceUpCards[_cardIndex++] = _deck.DrawCard();
+            // Tell players about the new flopped cards
         }
 
         /// <summary>
@@ -67,12 +68,13 @@ namespace PokerServer.Core
             // Burn card
             _deck.DrawCard();
             _faceUpCards[_cardIndex++] = _deck.DrawCard();
+            // Tell players about the turn/river
         }
 
         /// <summary>
-        /// Determines which player(s) have the best hands.
+        /// Determines which player(s) have the best hand(s).
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The player(s) with the best hand(s)</returns>
         public List<Player> CalculateWinners()
         {
             var playerScores = new Dictionary<Player, uint>();
@@ -91,6 +93,33 @@ namespace PokerServer.Core
         public void AddPlayer(Player player)
         {
             Players.Add(player);
+        }
+
+        public void MarkPlayerFolded(Guid playerId)
+        {
+            var player = Players.Where(p => p.Id == playerId).First();
+            if (player != null)
+                player.HasFolded = true;
+        }
+
+        /// <summary>
+        /// Distributes the pot to winner(s) of the hand.
+        /// </summary>
+        /// <param name="players">People receiving the pot this round</param>
+        public void DistributePot(List<Player> players)
+        {
+            var shareOfPot = Pot / players.Count;
+            foreach (var player in players)
+                player.Chips += shareOfPot;
+        }
+
+        public void PlaceBet(Guid playerId, int betAmount)
+        {
+            var player = Players.Where(p => p.Id == playerId).First();
+            if (player != null && player.Chips >= betAmount)
+                player.Chips -= betAmount;
+            else
+                Console.WriteLine("Player doesn't have enough chips for bet");
         }
     }
 }

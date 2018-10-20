@@ -70,6 +70,20 @@ namespace PokerServer.Model
         }
 
         /// <summary>
+        /// Draws the top N cards from the deck.
+        /// </summary>
+        /// <param name="n">Number of cards to draw</param>
+        /// <returns>Iterator containing the cards</returns>
+        public IEnumerable<Card> DrawCards(int n)
+        {
+            if (_index >= _cards.Count)
+                throw new InvalidOperationException("Error: no more cards left to draw.");
+
+            for (var i = 0; i < n; i++)
+                yield return _cards[_index++];
+        }
+
+        /// <summary>
         /// Resets the deck back to having no cards drawn from it.
         /// </summary>
         public void Reset()
