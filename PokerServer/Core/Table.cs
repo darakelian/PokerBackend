@@ -22,6 +22,7 @@ namespace PokerServer.Core
         private Card[] _faceUpCards;
         private int _cardIndex;
         private int _checks;
+        private int _lastRaisedId;
 
         public int Pot;
         public bool GameInProgress;
@@ -54,7 +55,10 @@ namespace PokerServer.Core
             _cardIndex = 0;
             _deck.Reset();
             foreach (var player in Players)
+            {
                 player.HasFolded = false;
+                player.EmptyHand();
+            }
             GameInProgress = true;
 
             // Deal 2 cards to each player
@@ -75,7 +79,7 @@ namespace PokerServer.Core
                     Rank2 = player.CardInSpot(1).Rank,
                     Suit1 = (char) player.CardInSpot(0).Suit,
                     Suit2 = (char) player.CardInSpot(1).Suit,
-                    Pot = this.Pot,
+                    Pot = Pot,
                     NumPlayers = (byte) (Players.Count - 1),
                     PlayersChips = Players.Where(p => p.Id != player.Id).Select(p => p.Chips).ToArray(),
                     PlayerIds = Players.Where(p => p.Id != player.Id).Select(p => p.Id).ToArray()
@@ -150,6 +154,7 @@ namespace PokerServer.Core
                 _playerBets[key] = 0;
             }
             _lastBet = 0;
+            _lastRaisedId = -1;
         }
 
         /// <summary>
@@ -182,9 +187,25 @@ namespace PokerServer.Core
             if (player != null)
             {
                 player.HasFolded = true;
+                if (_playersLeft == 1)
+                    EndGame();
                 return true;
             }
             return false;
+        }
+
+        private void EndGame()
+        {
+            var winners = CalculateWinners();
+            DistributePot(winners);
+            var winnerPacket = new UpdateWinners
+            {
+                PacketId = 6,
+                WinnerIds = winners.Select(p => p.Id).ToArray(),
+                NewWinnerPots = winners.Select(p => p.Chips).ToArray()
+            };
+            _server.BroadcastMessage(JsonConvert.SerializeObject(winnerPacket));
+            StartGame();
         }
 
         /// <summary>
@@ -211,11 +232,16 @@ namespace PokerServer.Core
                     return false;
                 }
                 player.Chips -= betAmount;
+                if (betAmount > _lastBet)
+                {
+                    Console.WriteLine("Player has raised for this betting roung.");
+                    _lastRaisedId = playerId;
+                }
                 // Reset the number of checks that have happened this betting round
                 _checks = 0; 
                 _lastBet = betAmount;
                 Pot += betAmount;
-                _playerBets[playerId] = betAmount;
+                _playerBets[playerId] += betAmount;
                 return true;
             }
             else
@@ -242,17 +268,22 @@ namespace PokerServer.Core
             _checks++;
             if (_checks == _playersLeft)
             {
-                // Taking a flop
-                if (_faceUpCards[0] == null)
-                    Flop();
-                // Either turn or river here
-                else if (_faceUpCards[3] == null || _faceUpCards[4] == null)
-                    TurnOrRiver();
-                // Calculate the winners
-                else
-                    CalculateWinners();
+                DetermineNextCardAction();
             }
             return true;
+        }
+
+        private void DetermineNextCardAction()
+        {
+            // Taking a flop
+            if (_faceUpCards[0] == null)
+                Flop();
+            // Either turn or river here
+            else if (_faceUpCards[3] == null || _faceUpCards[4] == null)
+                TurnOrRiver();
+            // Calculate the winners
+            else
+                EndGame();
         }
 
         public void CycleActivePlayer()
@@ -274,6 +305,14 @@ namespace PokerServer.Core
                     PersonalBid = _playerBets[id]
                 };
                 socket.Send(JsonConvert.SerializeObject(markActivePacket));
+            }
+
+            // This conditional checks if the action has gotten back to the person
+            // who originally raised. That player isn't allow to raise again and
+            // the game immediately proceedes to the next card.
+            if (_lastRaisedId == ActivePlayer.Id)
+            {
+                DetermineNextCardAction();
             }
         }
     }

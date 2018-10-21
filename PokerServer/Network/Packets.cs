@@ -59,6 +59,13 @@ namespace PokerServer.Network
             public int NewPotCount;
         }
 
+        struct UpdateWinners
+        {
+            public byte PacketId;
+            public int[] WinnerIds;
+            public int[] NewWinnerPots;
+        }
+
         struct GameMessagePacket
         {
             public byte PacketId;
@@ -70,8 +77,7 @@ namespace PokerServer.Network
     /// Packets sent by the client.
     /// 0 - Login
     /// 1 - Bet
-    /// 2 - Check
-    /// 3 - Fold
+    /// 2 - Check/Fold
     /// </summary>
     namespace ClientPackets
     {

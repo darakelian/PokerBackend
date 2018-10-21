@@ -56,5 +56,11 @@ namespace PokerServer.Model
             else
                 _hand[1] = card;
         }
+
+        public void EmptyHand()
+        {
+            _hand[0] = null;
+            _hand[1] = null;
+        }
     }
 }

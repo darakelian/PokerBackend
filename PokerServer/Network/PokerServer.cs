@@ -27,7 +27,7 @@ namespace PokerServer.Network
             UserIdToSockets = new Dictionary<int, IWebSocketConnection>();
             _table = new Table(this);
 
-            var server = new WebSocketServer("ws://0.0.0.0:9001");
+            var server = new WebSocketServer("ws://0.0.0.0:9000");
             server.Start(socket =>
             {
                 socket.OnOpen = () => Console.WriteLine("Open!");
