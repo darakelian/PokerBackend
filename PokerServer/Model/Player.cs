@@ -29,14 +29,16 @@ namespace PokerServer.Model
 
         public int Chips;
         private Card[] _hand;
-        public Guid Id;
+        public int Id;
 
         public string Hand => string.Join(" ", _hand.ToList());
+        public Card CardInSpot(int index) => _hand[index];
 
-        public Player()
+        public Player(int id)
         {
-            Id = Guid.NewGuid();
+            Id = id;
             _hand = new Card[2];
+            Chips = 1000;
         }
 
         /// <summary>

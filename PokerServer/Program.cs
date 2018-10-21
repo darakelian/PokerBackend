@@ -1,6 +1,4 @@
-﻿using HoldemHand;
-using PokerServer.Core;
-using PokerServer.Model;
+﻿using SimpleTCPStandar;
 using System;
 
 namespace PokerServer
@@ -9,7 +7,7 @@ namespace PokerServer
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            /*Console.WriteLine("Hello World!");
             var table = new Table();
             for (var i = 0; i < 4; i++)
                 table.AddPlayer(new Player());
@@ -26,7 +24,12 @@ namespace PokerServer
             foreach (var player in table.Players)
                 if (!winners.Contains(player))
                     Console.WriteLine(player.Hand);
-            Console.Read();
+            Console.Read();*/
+            Console.WriteLine("Beginning server loop.");
+            var server = new Network.PokerServer();
+            while (true) ;
         }
+
+        
     }
 }
