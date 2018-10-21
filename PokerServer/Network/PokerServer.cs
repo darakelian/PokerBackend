@@ -27,7 +27,7 @@ namespace PokerServer.Network
             UserIdToSockets = new Dictionary<int, IWebSocketConnection>();
             _table = new Table(this);
 
-            var server = new WebSocketServer("ws://0.0.0.0:9000");
+            var server = new WebSocketServer("ws://0.0.0.0:9001");
             server.Start(socket =>
             {
                 socket.OnOpen = () => Console.WriteLine("Open!");
@@ -46,6 +46,7 @@ namespace PokerServer.Network
             Console.WriteLine($"Socket {socket.ConnectionInfo} received {message}.");
             var packet = JToken.Parse(message);
             var packetId = packet.Value<int>("PacketId");
+            var uid = packet.Value<int>("UserId");
             // Compare packet IDs to the client packets
             switch (packetId)
             {
@@ -53,8 +54,7 @@ namespace PokerServer.Network
                 case 0:
                     if (_table.GameInProgress)
                         return;
-
-                    var uid = packet.Value<int>("UserId");
+                    
                     if (uid == -1)
                     {
                         Console.WriteLine("Creating new user.");
@@ -93,8 +93,66 @@ namespace PokerServer.Network
                     break;
                 // Bet/call request
                 case 1:
+                    if (uid != _table.ActivePlayer.Id || !_table.GameInProgress)
+                        return;
+
+                    Console.WriteLine($"Player {uid} submitted bid for {packet.Value<int>("BetAmount")}");
+                    if (_table.PlaceBet(uid, packet.Value<int>("BetAmount")))
+                    {
+                        var updateChipPacket = new UpdatePlayerChipCount
+                        {
+                            PacketId = 5,
+                            UserId = uid,
+                            NewChipCount = _table.ActivePlayer.Chips,
+                            NewPotCount = _table.Pot
+                        };
+                        
+                        BroadcastMessage(JsonConvert.SerializeObject(updateChipPacket));
+                        _table.CycleActivePlayer();
+                    }
+                    break;
+                // General action request
+                case 2:
+                    if (uid != _table.ActivePlayer.Id || !_table.GameInProgress)
+                        return;
+
+                    var action = packet.Value<GeneralAction>("Action");
+                    var handled = false;
+                    if (action == GeneralAction.Check)
+                    {
+                        handled = _table.HandleCheck(uid);
+                    }
+                    else
+                    {
+                        handled = _table.MarkPlayerFolded(uid);
+                    }
+
+                    if (handled)
+                        _table.CycleActivePlayer();
                     break;
             }
+        }
+
+        /// <summary>
+        /// Broadcasts a message to all clients regardless of who generated the
+        /// original message.
+        /// </summary>
+        /// <param name="message">The message being sent</param>
+        public void BroadcastMessage(string message)
+        {
+            foreach (var socket in UserIdToSockets.Values)
+                socket.Send(message);
+        }
+
+        public void SendGameMessage(int playerId, string message)
+        {
+            var gameMessagePacket = new GameMessagePacket
+            {
+                PacketId = 255,
+                Message = message
+            };
+            Console.WriteLine($"Sending game message packet(msg={message})");
+            UserIdToSockets[playerId].Send(JsonConvert.SerializeObject(gameMessagePacket));
         }
     }
 }

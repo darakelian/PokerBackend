@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PokerServer.Core;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -22,6 +23,7 @@ namespace PokerServer.Network
             public char Rank2;
             public char Suit1;
             public char Suit2;
+            public int Pot;
             public byte NumPlayers;
             public int[] PlayersChips;
             public int[] PlayerIds;
@@ -45,7 +47,22 @@ namespace PokerServer.Network
         {
             public byte PacketId;
             public int UserId;
-            public bool IsActive;
+            public int HighestBid;
+            public int PersonalBid;
+        }
+
+        struct UpdatePlayerChipCount
+        {
+            public byte PacketId;
+            public int UserId;
+            public int NewChipCount;
+            public int NewPotCount;
+        }
+
+        struct GameMessagePacket
+        {
+            public byte PacketId;
+            public string Message;
         }
     }
 
@@ -115,6 +132,11 @@ namespace PokerServer.Network
             /// User ID of person making request.
             /// </summary>
             public int UserId;
+
+            /// <summary>
+            /// The action being taken (either fold or check here).
+            /// </summary>
+            public GeneralAction Action;
         }
     }
 }

@@ -21,9 +21,16 @@ namespace PokerServer.Core
 
         private Card[] _faceUpCards;
         private int _cardIndex;
+        private int _checks;
 
         public int Pot;
         public bool GameInProgress;
+        private int _activePlayerIndex;
+        public Player ActivePlayer => Players[_activePlayerIndex];
+        private int _playersLeft => Players.Where(p => !p.HasFolded).Count();
+
+        private int _lastBet;
+        private Dictionary<int, int> _playerBets;
 
         public string Board => string.Join(" ", _faceUpCards.ToList());
 
@@ -42,6 +49,7 @@ namespace PokerServer.Core
         /// </summary>
         public void StartGame()
         {
+            _playerBets = Players.ToDictionary(p => p.Id, p => 0);
             // Reset state of the game
             _cardIndex = 0;
             _deck.Reset();
@@ -67,6 +75,7 @@ namespace PokerServer.Core
                     Rank2 = player.CardInSpot(1).Rank,
                     Suit1 = (char) player.CardInSpot(0).Suit,
                     Suit2 = (char) player.CardInSpot(1).Suit,
+                    Pot = this.Pot,
                     NumPlayers = (byte) (Players.Count - 1),
                     PlayersChips = Players.Where(p => p.Id != player.Id).Select(p => p.Chips).ToArray(),
                     PlayerIds = Players.Where(p => p.Id != player.Id).Select(p => p.Id).ToArray()
@@ -76,6 +85,13 @@ namespace PokerServer.Core
             }
 
             // Assign a player the active role.
+            _activePlayerIndex = 0;
+            var markActivePacket = new MarkActivePlayer
+            {
+                PacketId = 4,
+                UserId = ActivePlayer.Id
+            };
+            _server.BroadcastMessage(JsonConvert.SerializeObject(markActivePacket));
         }
 
         /// <summary>
@@ -85,9 +101,21 @@ namespace PokerServer.Core
         {
             // Burn card
             _deck.DrawCard();
+            var drawnCards = new List<Card>();
             for (var i = 0; i < 3; i++)
-                _faceUpCards[_cardIndex++] = _deck.DrawCard();
+            {
+                drawnCards.Add(_faceUpCards[_cardIndex++] = _deck.DrawCard());
+            }
             // Tell players about the new flopped cards
+            ResetBettingState();
+
+            var flopPacket = new UpdateFlopCards
+            {
+                PacketId = 2,
+                Ranks = drawnCards.Select(c => c.Rank).ToArray(),
+                Suits = drawnCards.Select(c => (char)c.Suit).ToArray()
+            };
+            _server.BroadcastMessage(JsonConvert.SerializeObject(flopPacket));
         }
 
         /// <summary>
@@ -97,8 +125,31 @@ namespace PokerServer.Core
         {
             // Burn card
             _deck.DrawCard();
-            _faceUpCards[_cardIndex++] = _deck.DrawCard();
+            var drawnCard = _faceUpCards[_cardIndex++] = _deck.DrawCard();
             // Tell players about the turn/river
+            ResetBettingState();
+
+            var turnOrRiverPacket = new UpdateTurnOrRiverCard
+            {
+                PacketId = 3,
+                Rank = drawnCard.Rank,
+                Suit = (char)drawnCard.Suit
+            };
+            _server.BroadcastMessage(JsonConvert.SerializeObject(turnOrRiverPacket));
+        }
+
+        /// <summary>
+        /// Resets various counting/tracking variables related to the betting in
+        /// the current round (i.e. pre-flop, post-flop, post-turn, post-river).
+        /// </summary>
+        private void ResetBettingState()
+        {
+            _checks = 0;
+            foreach (var key in _playerBets.Keys.ToList())
+            {
+                _playerBets[key] = 0;
+            }
+            _lastBet = 0;
         }
 
         /// <summary>
@@ -125,11 +176,15 @@ namespace PokerServer.Core
             Players.Add(player);
         }
 
-        public void MarkPlayerFolded(int playerId)
+        public bool MarkPlayerFolded(int playerId)
         {
             var player = Players.Where(p => p.Id == playerId).First();
             if (player != null)
+            {
                 player.HasFolded = true;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -143,13 +198,83 @@ namespace PokerServer.Core
                 player.Chips += shareOfPot;
         }
 
-        public void PlaceBet(int playerId, int betAmount)
+        public bool PlaceBet(int playerId, int betAmount)
         {
             var player = Players.Where(p => p.Id == playerId).First();
             if (player != null && player.Chips >= betAmount)
+            {
+                // See if the bet needs to be a certain amonut
+                var minimumBet = _lastBet - _playerBets[playerId];
+                if (minimumBet > betAmount)
+                {
+                    _server.SendGameMessage(playerId, $"Error: Bid amount must be large enough to call. Expected {minimumBet}, you bet {betAmount}");
+                    return false;
+                }
                 player.Chips -= betAmount;
+                // Reset the number of checks that have happened this betting round
+                _checks = 0; 
+                _lastBet = betAmount;
+                Pot += betAmount;
+                _playerBets[playerId] = betAmount;
+                return true;
+            }
             else
-                Console.WriteLine("Player doesn't have enough chips for bet");
+            {
+                _server.SendGameMessage(playerId, "Error: Don't have enough chips for that bet.");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Handles a player choosing to check for their turn.
+        /// </summary>
+        /// <param name="checkingPlayerId"></param>
+        public bool HandleCheck(int checkingPlayerId)
+        {
+            // See if the player can actually check. If there is a bet that
+            // they haven't acted on they can't check.
+            if (_playerBets[checkingPlayerId] < _lastBet)
+            {
+                _server.SendGameMessage(checkingPlayerId, "Error: Unable to check due to existing bid on the table.");
+                return false;
+            }
+
+            _checks++;
+            if (_checks == _playersLeft)
+            {
+                // Taking a flop
+                if (_faceUpCards[0] == null)
+                    Flop();
+                // Either turn or river here
+                else if (_faceUpCards[3] == null || _faceUpCards[4] == null)
+                    TurnOrRiver();
+                // Calculate the winners
+                else
+                    CalculateWinners();
+            }
+            return true;
+        }
+
+        public void CycleActivePlayer()
+        {
+            // Cycle to the next active player that hasn't folded.
+            do
+            {
+                _activePlayerIndex = _activePlayerIndex + 1 < Players.Count ? ++_activePlayerIndex : 0;
+            }
+            while (ActivePlayer.HasFolded);
+
+            foreach (var (id, socket) in _server.UserIdToSockets)
+            {
+                var markActivePacket = new MarkActivePlayer
+                {
+                    PacketId = 4,
+                    UserId = ActivePlayer.Id,
+                    HighestBid = _lastBet,
+                    PersonalBid = _playerBets[id]
+                };
+                socket.Send(JsonConvert.SerializeObject(markActivePacket));
+            }
         }
     }
 }
