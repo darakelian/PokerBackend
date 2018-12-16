@@ -26,10 +26,8 @@ namespace PokerServer
                     Console.WriteLine(player.Hand);
             Console.Read();*/
             Console.WriteLine("Beginning server loop.");
-            var server = new Network.PokerServer();
+            var server = new Network.TcpServer();
             while (true) ;
         }
-
-        
     }
 }
